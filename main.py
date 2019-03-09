@@ -1,12 +1,7 @@
-# detector/emiter step
-delta_alpha = 5
-# number of detectors
-n = 30
-# detector/emiter span
-l = 30
-
 import cv2
 from matplotlib import pyplot as plt
+import math
+import numpy as np
 
 def plot_image(img):
     plt.imshow(img,cmap='gray')
@@ -94,6 +89,15 @@ def get_detectors_pos(size, delta_alpha, n, l):
 #         lines.append(lines_per_angle)
 #     return lines
 
+def normalize(img):
+    cp = img[:]
+    maximum = np.amax(img)
+    for i in range(len(img)):
+        for j in range(len(img[0])):
+            cp[i][j] = img[i][j]/maximum * 266
+    return cp
+
+
 def gen_sinogram(img, emiter_pos, detectors_pos):
     sinogram = np.zeros(shape=(n,len(emiter_pos)))
     for it in range(len(emiter_pos)): #iterations
@@ -103,13 +107,17 @@ def gen_sinogram(img, emiter_pos, detectors_pos):
             line = gen_line(emit_x, emit_y, det_x, det_y)
             values = [img[x][y] for (x,y) in line]
             sinogram[detector_id][it] = sum([x/len(line) for x in values])
-    plot_image(sinogram)
+    return sinogram
 
-import math
-import numpy as np
+if __name__ == "__main__":    
+    delta_alpha = 5 # detector/emiter step
+    n = 30 # number of detectors
+    l = 60 # detector/emiter span
 
-img = load('./data/03.png')
-size = img.shape[:2]
-emiter_pos = gen_emiter_pos(size, delta_alpha)
-detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
-gen_sinogram(img, emiter_pos, detectors_pos)
+    img = load('./data/03.png')
+    size = img.shape[:2]
+    emiter_pos = gen_emiter_pos(size, delta_alpha)
+    detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
+    sinogram = gen_sinogram(img, emiter_pos, detectors_pos)
+    normalize_sin = normalize(sinogram)
+    plot_image(normalize_sin)
