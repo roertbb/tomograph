@@ -109,15 +109,83 @@ def gen_sinogram(img, emiter_pos, detectors_pos):
             sinogram[detector_id][it] = sum([x/len(line) for x in values])
     return sinogram
 
+def normalize_image(size, image, counter):
+    x,y = size
+    cp = image[:]
+    maximum = 0
+    for i in range(x):
+        for j in range(y):
+            if int(counter[i][j]) > 0 and image[i][j] > 0:
+                maximum = image[i][j]
+    for i in range(x):
+        for j in range(y):
+            if int(counter[i][j]) > 0 and image[i][j] > 0:
+                cp[i][j] = image[i][j]/maximum * 255
+    return cp
+    
+
+def gen_image(size, sinogram, emiter_pos, detectors_pos):
+    x, y = size
+    image = np.zeros(shape=size)
+    counter = np.zeros(shape=size)
+    for it in range(len(emiter_pos)): #iterations
+        for detector_id in range(len(detectors_pos)):
+            emit_x, emit_y = emiter_pos[it]
+            det_x, det_y = detectors_pos[detector_id][it]
+            line = gen_line(emit_x, emit_y, det_x, det_y)
+            # print(sinogram[detector_id][it])
+            for (x,y) in line:
+                image[x][y] = image[x][y] + sinogram[detector_id][it]
+                counter[x][y] = counter[x][y] + 1
+    for i in range(x):
+        for j in range(y):
+            image[x][y] = image[x][y]/counter[x][y]
+
+    normalized_image = normalize_image(size, image, counter)
+    # return image
+    return normalized_image
+
+def calc_mask_value(img, mask, i, j, mask_padding):
+    y = len(mask)
+    x = len(mask[0])
+    value = 0
+    for y in range(i-mask_padding,i+mask_padding+1):
+        for x in range(j-mask_padding,j+mask_padding+1):
+            value += img[y][x]/(len(mask)**2)
+    return value
+
+def apply_mask(img, size, mask):
+    cp = img[:]
+    w,h = size
+    mask_padding = int(len(mask)/2)
+    for i in range(mask_padding,w-mask_padding):
+        for j in range(mask_padding,h-mask_padding):
+            cp[i][j] = calc_mask_value(img, mask, i, j, mask_padding)
+    return normalize(cp)
+
+
 if __name__ == "__main__":    
     delta_alpha = 5 # detector/emiter step
-    n = 30 # number of detectors
-    l = 60 # detector/emiter span
+    n = 50 # number of detectors
+    l = 90 # detector/emiter span
 
-    img = load('./data/03.png')
+    img = load('./data/Shepp_logan.jpg')
     size = img.shape[:2]
     emiter_pos = gen_emiter_pos(size, delta_alpha)
     detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
     sinogram = gen_sinogram(img, emiter_pos, detectors_pos)
     normalize_sin = normalize(sinogram)
-    plot_image(normalize_sin)
+    # plot_image(normalize_sin)
+    image = gen_image(size, normalize_sin, emiter_pos, detectors_pos)
+    mask = [
+        [0,0,0,-1,0,0,0],
+        [0,-1,-1-1,-1,-1,0],
+        [0,-1,-1,3,-1,-1,0],
+        [0,-1,3,3,3,-1,0],
+        [0,-1,-1,3,-1,-1,0],
+        [0,-1,-1-1,-1,-1,0],
+        [0,0,0,-1,0,0,0],
+        ]
+    masked_img = apply_mask(image, size, mask)
+    normalized_image = normalize(masked_img)
+    plot_image(normalized_image)
