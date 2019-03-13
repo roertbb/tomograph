@@ -163,29 +163,46 @@ def apply_mask(img, size, mask):
             cp[i][j] = calc_mask_value(img, mask, i, j, mask_padding)
     return normalize(cp)
 
+def adjust(sinogram,i,j,mask,padding):
+    s = 0
+    for x in range(len(mask)):
+        s += sinogram[i-padding+x][j]
+    return s/len(mask)
+
+def adjust_sinogram(sinogram):
+    x,y = sinogram.shape
+    mask = [-1,-1,3,3,3,-1-1]
+    cp = sinogram[:]
+    padding = int(len(mask)/2)
+    # print(x,y,padding)
+    for i in range(padding, x-padding):
+        for j in range(y):
+            cp[i][j] = adjust(sinogram,i,j,mask,padding)
+    return cp
 
 if __name__ == "__main__":    
-    delta_alpha = 5 # detector/emiter step
-    n = 50 # number of detectors
+    delta_alpha = 1 # detector/emiter step
+    n = 30 # number of detectors
     l = 90 # detector/emiter span
 
-    img = load('./data/Shepp_logan.jpg')
+    img = load('./data/Kwadraty2.jpg')
     size = img.shape[:2]
     emiter_pos = gen_emiter_pos(size, delta_alpha)
     detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
     sinogram = gen_sinogram(img, emiter_pos, detectors_pos)
-    normalize_sin = normalize(sinogram)
-    # plot_image(normalize_sin)
+    normalize_sin = adjust_sinogram(sinogram)
+    normalize_sin = normalize(normalize_sin)
+    plot_image(normalize_sin)
     image = gen_image(size, normalize_sin, emiter_pos, detectors_pos)
-    mask = [
-        [0,0,0,-1,0,0,0],
-        [0,-1,-1-1,-1,-1,0],
-        [0,-1,-1,3,-1,-1,0],
-        [0,-1,3,3,3,-1,0],
-        [0,-1,-1,3,-1,-1,0],
-        [0,-1,-1-1,-1,-1,0],
-        [0,0,0,-1,0,0,0],
-        ]
-    masked_img = apply_mask(image, size, mask)
-    normalized_image = normalize(masked_img)
+    # mask = [
+    #     [0,0,0,-1,0,0,0],
+    #     [0,-1,-1-1,-1,-1,0],
+    #     [0,-1,-1,3,-1,-1,0],
+    #     [0,-1,3,3,3,-1,0],
+    #     [0,-1,-1,3,-1,-1,0],
+    #     [0,-1,-1-1,-1,-1,0],
+    #     [0,0,0,-1,0,0,0],
+    #     ]
+    # masked_img = apply_mask(image, size, mask)
+    normalized_image = normalize(image)
     plot_image(normalized_image)
