@@ -2,6 +2,8 @@ import cv2
 from matplotlib import pyplot as plt
 import math
 import numpy as np
+import time
+import multiprocessing as mp
 
 def plot_image(img):
     plt.imshow(img,cmap='gray')
@@ -9,7 +11,19 @@ def plot_image(img):
     plt.show()
     
 def load(img_name):
-    return cv2.imread(img_name,cv2.IMREAD_GRAYSCALE)
+    image = cv2.imread(img_name,cv2.IMREAD_GRAYSCALE)
+    # return image
+    old_size = image.shape[:2] 
+
+    img = cv2.resize(image, (0,0), fx=0.5, fy=0.5) 
+
+    delta_x = int(old_size[1]/4)
+    delta_y = int(old_size[0]/4)
+
+    color = [0, 0, 0]
+    resized_image = cv2.copyMakeBorder(img, delta_y, delta_y, delta_x, delta_x, cv2.BORDER_CONSTANT,value=color)
+
+    return resized_image
 
 # get pixels position within line based on Bresenhama algorithm
 def gen_line(x1,y1,x2,y2):
@@ -52,14 +66,15 @@ def gen_line(x1,y1,x2,y2):
             line.append((x,y))
     return line
 
-    # generate emiters position according to angle
+# generate emiters position according to angle
 def gen_emiter_pos(size, delta_alpha):
     w,h = size
     center_x = w/2
     center_y = h/2
-    r = min(w/2-5,h/2-5)
-    x = [round(math.cos(math.radians(delta_alpha*i))*r + center_x) for i in range(int(360/delta_alpha))]
-    y = [round(math.sin(math.radians(delta_alpha*i))*r + center_y) for i in range(int(360/delta_alpha))]
+    r = min(w-5,h-5)
+    samples = int(360/delta_alpha)
+    x = [round(math.cos(math.radians(delta_alpha*i))*r + center_x) for i in range(samples)]
+    y = [round(math.sin(math.radians(delta_alpha*i))*r + center_y) for i in range(samples)]
     return list(zip(x,y))
 
 # generate all detectors position according to angle
@@ -68,45 +83,41 @@ def get_detectors_pos(size, delta_alpha, n, l):
     w,h = size
     center_x = w/2
     center_y = h/2
-    r = min(w/2-5,h/2-5)
+    r = min(w-5,h-5)
+    samples = int(360/delta_alpha)
     tpd = l/n # angle translation per detector
     for i in range(n):
         translation = 180 - (n/2 * tpd) + (i * tpd) + 1/2 * tpd
-        x = [round(math.cos(math.radians(delta_alpha*i + translation))*r + center_x) for i in range(int(360/delta_alpha))]
-        y = [round(math.sin(math.radians(delta_alpha*i + translation))*r + center_y) for i in range(int(360/delta_alpha))]
+        x = [round(math.cos(math.radians(delta_alpha*i + translation))*r + center_x) for i in range(samples)]
+        y = [round(math.sin(math.radians(delta_alpha*i + translation))*r + center_y) for i in range(samples)]
         detectors.append(list(zip(x,y)))
     return detectors
-
-# def generate_all_lines(emiter_pos, detectors_pos):
-#     lines = []
-#     for i in range(len(emiter_pos)):
-#         lines_per_angle = []
-#         for detector_pos in detectors_pos[i]:
-#             emiter_x, emiter_y = emiter_pos[i]
-#             detector_x, detector_y = detector_pos
-#             line = gen_line(emiter_x, emiter_y, detector_x, detector_y)
-#             lines_per_angle.append(line)
-#         lines.append(lines_per_angle)
-#     return lines
 
 def normalize(img):
     cp = img[:]
     maximum = np.amax(img)
     for i in range(len(img)):
         for j in range(len(img[0])):
-            cp[i][j] = img[i][j]/maximum * 266
+            cp[i][j] = img[i][j]/maximum * 256
     return cp
 
 
-def gen_sinogram(img, emiter_pos, detectors_pos):
+def gen_sinogram(img, emiter_pos, detectors_pos, size):
     sinogram = np.zeros(shape=(n,len(emiter_pos)))
     for it in range(len(emiter_pos)): #iterations
         for detector_id in range(len(detectors_pos)):
             emit_x, emit_y = emiter_pos[it]
             det_x, det_y = detectors_pos[detector_id][it]
             line = gen_line(emit_x, emit_y, det_x, det_y)
-            values = [img[x][y] for (x,y) in line]
-            sinogram[detector_id][it] = sum([x/len(line) for x in values])
+            # values = [img[x][y] for (x,y) in line]
+            value = 0
+            counter = 0
+            for (x,y) in line:
+                if x > 0 and y > 0 and x < size[0] and y < size[1]:
+                    value += img[x][y]
+                    counter += 1
+            # sinogram[detector_id][it] = sum([x/len(line) for x in values])
+            sinogram[detector_id][it] = 0 if counter == 0 else int(value/counter)
     return sinogram
 
 def normalize_image(size, image, counter):
@@ -127,7 +138,7 @@ def normalize_image(size, image, counter):
 def gen_image(size, sinogram, emiter_pos, detectors_pos):
     x, y = size
     image = np.zeros(shape=size)
-    counter = np.zeros(shape=size)
+    counter = np.zeros(shape=size)    
     for it in range(len(emiter_pos)): #iterations
         for detector_id in range(len(detectors_pos)):
             emit_x, emit_y = emiter_pos[it]
@@ -135,57 +146,56 @@ def gen_image(size, sinogram, emiter_pos, detectors_pos):
             line = gen_line(emit_x, emit_y, det_x, det_y)
             # print(sinogram[detector_id][it])
             for (x,y) in line:
-                image[x][y] = image[x][y] + sinogram[detector_id][it]
-                counter[x][y] = counter[x][y] + 1
+                if x > 0 and y > 0 and x < size[0] and y < size[1]:
+                    image[x][y] += sinogram[detector_id][it]
+                    counter[x][y] += 1
     for i in range(x):
         for j in range(y):
-            image[x][y] = image[x][y]/counter[x][y]
+            image[i][j] = image[i][j]/counter[i][j]
 
     normalized_image = normalize_image(size, image, counter)
     # return image
     return normalized_image
 
-def calc_mask_value(img, mask, i, j, mask_padding):
-    y = len(mask)
-    x = len(mask[0])
-    value = 0
-    for y in range(i-mask_padding,i+mask_padding+1):
-        for x in range(j-mask_padding,j+mask_padding+1):
-            value += img[y][x]/(len(mask)**2)
-    return value
+def adjust(sinogram,i,j,mask,padding):
+    s = 0
+    for x in range(len(mask)):
+        s += sinogram[i-padding+x][j]
+    return s/len(mask)
 
-def apply_mask(img, size, mask):
-    cp = img[:]
-    w,h = size
-    mask_padding = int(len(mask)/2)
-    for i in range(mask_padding,w-mask_padding):
-        for j in range(mask_padding,h-mask_padding):
-            cp[i][j] = calc_mask_value(img, mask, i, j, mask_padding)
-    return normalize(cp)
-
+def adjust_sinogram(sinogram):
+    x,y = sinogram.shape
+    mask = [-1,-2,7,-2,-1]
+    cp = sinogram[:]
+    padding = int(len(mask)/2)
+    for i in range(padding, x-padding):
+        for j in range(y):
+            cp[i][j] = adjust(sinogram,i,j,mask,padding)
+    return cp
 
 if __name__ == "__main__":    
-    delta_alpha = 5 # detector/emiter step
-    n = 50 # number of detectors
-    l = 90 # detector/emiter span
+    delta_alpha = 1 # detector/emiter step
+    n = 400 # number of detectors
+    l = 230 # detector/emiter span
+
+    start = time.time()
 
     img = load('./data/Shepp_logan.jpg')
+    img = cv2.resize(img,(512,512))
     size = img.shape[:2]
+    start = time.time()
+
     emiter_pos = gen_emiter_pos(size, delta_alpha)
     detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
-    sinogram = gen_sinogram(img, emiter_pos, detectors_pos)
-    normalize_sin = normalize(sinogram)
+    sinogram = gen_sinogram(img, emiter_pos, detectors_pos, size)
+    print(time.time() - start)
+
+    normalize_sin = adjust_sinogram(sinogram)
+    normalize_sin = normalize(normalize_sin)
     # plot_image(normalize_sin)
     image = gen_image(size, normalize_sin, emiter_pos, detectors_pos)
-    mask = [
-        [0,0,0,-1,0,0,0],
-        [0,-1,-1-1,-1,-1,0],
-        [0,-1,-1,3,-1,-1,0],
-        [0,-1,3,3,3,-1,0],
-        [0,-1,-1,3,-1,-1,0],
-        [0,-1,-1-1,-1,-1,0],
-        [0,0,0,-1,0,0,0],
-        ]
-    masked_img = apply_mask(image, size, mask)
-    normalized_image = normalize(masked_img)
+    normalized_image = normalize(image)
+
+    print(time.time()-start)
+    
     plot_image(normalized_image)
