@@ -17,13 +17,6 @@ def load(img_name):
     if (size[0] > max_size or size[1] > max_size):
         image = cv2.resize(image,(int(max_size * size[1]/size[0]),int(max_size * size[0]/size[1])))
     return image
-    # old_size = image.shape[:2] 
-    # img = cv2.resize(image, (0,0), fx=0.5, fy=0.5) 
-    # delta_x = int(old_size[1]/4)
-    # delta_y = int(old_size[0]/4)
-    # color = [0, 0, 0]
-    # resized_image = cv2.copyMakeBorder(img, delta_y, delta_y, delta_x, delta_x, cv2.BORDER_CONSTANT,value=color)
-    # return resized_image
 
 # get pixels position within line based on Bresenhama algorithm
 def gen_line(x1,y1,x2,y2):
@@ -160,16 +153,6 @@ def lin_convolution(sinogram,i,j,mask,padding):
         s += sinogram[i-padding+x][j]
     return s/len(mask)
 
-# def sinogram_convolution(sinogram):
-#     y,x = sinogram.shape
-#     mask = [-1,-2,7,-2,-1]
-#     cp = sinogram[:]
-#     padding = int(len(mask)/2)
-#     for i in range(padding, y-padding):
-#         for j in range(x):
-#             cp[i][j] = lin_convolution(sinogram,i,j,mask,padding)
-#     return cp
-
 def gen_image(size, sinogram, emiter_pos, detectors_pos, callback=None):
     x, y = size
     image = np.zeros(shape=size)
@@ -198,23 +181,15 @@ if __name__ == "__main__":
     n = 400 # number of detectors
     l = 230 # detector/emiter span
 
-    start = time.time()
-
     img = load('./data/Shepp_logan.jpg')
     size = img.shape[:2]
-    start = time.time()
 
     emiter_pos = gen_emiter_pos(size, delta_alpha)
     detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
     sinogram = gen_sinogram(img, emiter_pos, detectors_pos, size)
-    print(time.time() - start)
 
-    # normalize_sin = sinogram_convolution(sinogram)
-    # normalize_sin = normalize(normalize_sin)
     plot_image(sinogram)
     image = gen_image(size, sinogram, emiter_pos, detectors_pos)
     normalized_image = normalize(image)
-
-    print(time.time()-start)
     
     plot_image(normalized_image)

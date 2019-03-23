@@ -1,8 +1,10 @@
 from tkinter import * 
+from tkinter import filedialog
 from PIL import ImageTk, Image
 import cv2
 import numpy as np
 from main import gen_emiter_pos, get_detectors_pos, gen_sinogram, gen_image, normalize_image_iterative
+# import pydicom
 
 class GUI(Frame):
     image_size = 300
@@ -55,7 +57,7 @@ class GUI(Frame):
         self.detectors_num_string.set(GUI.init_detectors_num)
         self.detectors_num_input.place(x=220,y=388)
 
-        self.angle_step_label = Label(self, text="Δα - Angle step (in degrees):")
+        self.angle_step_label = Label(self, text="delta_a - Angle step (in degrees):")
         self.angle_step_label.place(x=20,y=420)
         self.angle_step_string = StringVar()
         self.angle_step_input = Entry(self, textvariable=self.angle_step_string)
@@ -74,18 +76,36 @@ class GUI(Frame):
         self.convolution_checkbox = Checkbutton(self, text="Use convolution (noise reduction)", variable=self.convolution_checkbox_variable, command=self.convolution)
         self.convolution_checkbox.place(x=10,y=475)
 
+        self.load_image_btn = Button(self, text="Load image", command=lambda: self.choose_image())
+        self.load_image_btn.place(x=20, y=500)
+        
         self.run_tomograph = Button(self, text="Run tomograph", command=lambda: self.process())
-        self.run_tomograph.place(x=20, y=500)
+        self.run_tomograph.place(x=125, y=500)
 
         self.run_tomograph_iterative = Button(self, text="Run tomograph (iteratively)", command=lambda: self.process(iteratively=True))
-        self.run_tomograph_iterative.place(x=150, y=500)
+        self.run_tomograph_iterative.place(x=255, y=500)
 
-        self.status = Label(self, text="Status: -")
+        self.status = Label(self, text="Status:")
         self.status.place(x=20,y=535)
         
         self.load_image("./data/Shepp_logan.jpg")
 
         self.mainloop()
+
+    def choose_image(self):
+        file_path = filedialog.askopenfilename(initialdir = "./",title = "Select image to process",filetypes = (("jpeg files","*.jpg"),("dicom files","*.dcm"),("all files","*.*")))
+        splitted_path = file_path.split(".")
+        extension = splitted_path[len(splitted_path)-1].lower()
+        if extension == "dcm":
+            print("dicom")
+            # ds = pydicom.dcmread(file_path)
+            # print(ds.PixelData)
+            # plt.imshow(ds.pixel_array, cmap=plt.cm.bone)
+            # plt.show()
+        elif extension == "jpg" or extension == "png":
+            self.load_image(file_path)
+        else:
+            print("undefined extension")
 
     def display_image(self, position):
         if position == "original":
@@ -116,6 +136,7 @@ class GUI(Frame):
         img = self.resize_image_to_display(img)
         self.original_image = img
         self.display_image("original")
+        self.update()
 
     def update_sinogram(self,sinogram):
         self.sinogram = sinogram
