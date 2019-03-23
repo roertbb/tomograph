@@ -102,8 +102,8 @@ def normalize(img):
     return cp
 
 
-def gen_sinogram(img, emiter_pos, detectors_pos, size):
-    sinogram = np.zeros(shape=(n,len(emiter_pos)))
+def gen_sinogram(img, emiter_pos, detectors_pos, size, doConvolution = True, callback=None):
+    sinogram = np.zeros(shape=(len(detectors_pos),len(emiter_pos)))
     for it in range(len(emiter_pos)): #iterations
         for detector_id in range(len(detectors_pos)):
             emit_x, emit_y = emiter_pos[it]
@@ -116,24 +116,61 @@ def gen_sinogram(img, emiter_pos, detectors_pos, size):
                     value += img[x][y]
                     counter += 1
             sinogram[detector_id][it] = 0 if counter == 0 else int(value/counter)
+        if doConvolution:
+            mask = [-1,-2,7,-2,-1]
+            padding = int(len(mask)/2)
+            for i in range(padding, len(detectors_pos)-padding):
+                sinogram[i][it] = lin_convolution(sinogram,i,it,mask,padding)
+
+        if callback != None:
+            callback(sinogram)
+
     return sinogram
 
-def normalize_image(size, image, counter):
+def normalize_image_iterative(size, image, counter):
     x,y = size
-    cp = image[:]
     maximum = 0
     for i in range(x):
         for j in range(y):
+            if int(counter[i][j]) > 0 and image[i][j] > maximum:
+                maximum = image[i][j]
+                image[i][j] = image[i][j]/counter[i][j]
+    for i in range(x):
+        for j in range(y):
             if int(counter[i][j]) > 0 and image[i][j] > 0:
+                image[i][j] = image[i][j]/maximum * 255
+    return image
+
+def normalize_image(size, image, counter):
+    x,y = size
+    maximum = 0
+    for i in range(x):
+        for j in range(y):
+            if int(counter[i][j]) > 0 and image[i][j] > maximum:
                 maximum = image[i][j]
     for i in range(x):
         for j in range(y):
             if int(counter[i][j]) > 0 and image[i][j] > 0:
-                cp[i][j] = image[i][j]/maximum * 255
-    return cp
+                image[i][j] = image[i][j]/maximum * 255
+    return image
     
+def lin_convolution(sinogram,i,j,mask,padding):
+    s = 0
+    for x in range(len(mask)):
+        s += sinogram[i-padding+x][j]
+    return s/len(mask)
 
-def gen_image(size, sinogram, emiter_pos, detectors_pos):
+# def sinogram_convolution(sinogram):
+#     y,x = sinogram.shape
+#     mask = [-1,-2,7,-2,-1]
+#     cp = sinogram[:]
+#     padding = int(len(mask)/2)
+#     for i in range(padding, y-padding):
+#         for j in range(x):
+#             cp[i][j] = lin_convolution(sinogram,i,j,mask,padding)
+#     return cp
+
+def gen_image(size, sinogram, emiter_pos, detectors_pos, callback=None):
     x, y = size
     image = np.zeros(shape=size)
     counter = np.zeros(shape=size)    
@@ -146,28 +183,15 @@ def gen_image(size, sinogram, emiter_pos, detectors_pos):
                 if x > 0 and y > 0 and x < size[0] and y < size[1]:
                     image[x][y] += sinogram[detector_id][it]
                     counter[x][y] += 1
+        if callback != None:
+            callback(size, np.copy(image), np.copy(counter))
+
     for i in range(x):
         for j in range(y):
             image[i][j] = image[i][j]/counter[i][j]
 
     normalized_image = normalize_image(size, image, counter)
     return normalized_image
-
-def lino_convolution(sinogram,i,j,mask,padding):
-    s = 0
-    for x in range(len(mask)):
-        s += sinogram[i-padding+x][j]
-    return s/len(mask)
-
-def sinogram_convolution(sinogram):
-    x,y = sinogram.shape
-    mask = [-1,-2,7,-2,-1]
-    cp = sinogram[:]
-    padding = int(len(mask)/2)
-    for i in range(padding, x-padding):
-        for j in range(y):
-            cp[i][j] = lino_convolution(sinogram,i,j,mask,padding)
-    return cp
 
 if __name__ == "__main__":    
     delta_alpha = 1 # detector/emiter step
@@ -185,10 +209,10 @@ if __name__ == "__main__":
     sinogram = gen_sinogram(img, emiter_pos, detectors_pos, size)
     print(time.time() - start)
 
-    normalize_sin = sinogram_convolution(sinogram)
-    normalize_sin = normalize(normalize_sin)
-    # plot_image(normalize_sin)
-    image = gen_image(size, normalize_sin, emiter_pos, detectors_pos)
+    # normalize_sin = sinogram_convolution(sinogram)
+    # normalize_sin = normalize(normalize_sin)
+    plot_image(sinogram)
+    image = gen_image(size, sinogram, emiter_pos, detectors_pos)
     normalized_image = normalize(image)
 
     print(time.time()-start)
