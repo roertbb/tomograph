@@ -3,7 +3,7 @@ from tkinter import filedialog
 from PIL import ImageTk, Image
 import cv2
 import numpy as np
-from main import gen_emiter_pos, get_detectors_pos, gen_sinogram, gen_image, normalize_image_iterative
+from main import gen_emiter_pos, get_detectors_pos, gen_sinogram, gen_image, normalize_image_iterative, apply_window
 # import pydicom
 
 class GUI(Frame):
@@ -172,9 +172,7 @@ class GUI(Frame):
         emiter_pos = gen_emiter_pos(img_size, delta_a)
         detectors_pos = get_detectors_pos(img_size, delta_a, n, l)
         sinogram = gen_sinogram(self.original_image, emiter_pos, detectors_pos, img_size, doConvolution, callback=sinogram_callback)
-        self.sinogram = sinogram
-        self.display_image("sinogram")
-        self.update()
+        sinogram = apply_window(sinogram)
         generated_image = gen_image(img_size, sinogram, emiter_pos, detectors_pos, callback=generate_image_callback)
         self.generated_image = generated_image
         self.display_image("generated")

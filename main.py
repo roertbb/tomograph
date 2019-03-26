@@ -11,8 +11,10 @@ def plot_image(img):
     plt.show()
     
 def load(img_name):
-    max_size = 400
-    image = cv2.imread(img_name,cv2.IMREAD_GRAYSCALE)
+    max_size = 300
+    image = cv2.imread(img_name)
+    # rgb to gray
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     size = image.shape[:2]
     if (size[0] > max_size or size[1] > max_size):
         image = cv2.resize(image,(int(max_size * size[1]/size[0]),int(max_size * size[0]/size[1])))
@@ -173,23 +175,32 @@ def gen_image(size, sinogram, emiter_pos, detectors_pos, callback=None):
         for j in range(y):
             image[i][j] = image[i][j]/counter[i][j]
 
+    # return image
     normalized_image = normalize_image(size, image, counter)
     return normalized_image
+
+def apply_window(sinogram):
+    window =  np.bartlett(len(sinogram))
+    for i in range(len(sinogram[0])):
+        fft = np.fft.fft(sinogram[:,i])
+        fft = fft*window
+        ifft = np.real(np.fft.ifft(fft))
+        sinogram[:,i] = ifft
+    return sinogram
 
 if __name__ == "__main__":    
     delta_alpha = 1 # detector/emiter step
     n = 400 # number of detectors
     l = 230 # detector/emiter span
 
-    img = load('./data/Shepp_logan.jpg')
+    img = load('./data/CT_ScoutView.jpg')
     size = img.shape[:2]
 
     emiter_pos = gen_emiter_pos(size, delta_alpha)
     detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
     sinogram = gen_sinogram(img, emiter_pos, detectors_pos, size)
-
-    plot_image(sinogram)
+    sinogram = apply_window(sinogram)
+    # plot_image(sinogram)
     image = gen_image(size, sinogram, emiter_pos, detectors_pos)
-    normalized_image = normalize(image)
-    
-    plot_image(normalized_image)
+    # image = normalize(image)
+    plot_image(image)
