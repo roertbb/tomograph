@@ -110,18 +110,24 @@ class GUI(Frame):
     def display_image(self, position):
         if position == "original":
             img = ImageTk.PhotoImage(Image.fromarray(self.original_image))
-            self.original_image_label = Label(self, image=img)
+            if self.original_image_label == None:
+                self.original_image_label = Label(self, image=img)
+            self.original_image_label.configure(image=img)    
             self.original_image_label.image = img
             self.original_image_label.place(x=20+GUI.image_size/2, y=20+GUI.image_size/2,anchor="center")
         elif position == "sinogram":
             sinogram_to_display = self.resize_image_to_display(self.sinogram[:])
             img = ImageTk.PhotoImage(Image.fromarray(sinogram_to_display))
-            self.sinogram_label = Label(self, image=img)
+            if self.sinogram_label == None:
+                self.sinogram_label = Label(self, image=img)
+            self.sinogram_label.configure(image=img)
             self.sinogram_label.image = img
             self.sinogram_label.place(x=340+GUI.image_size/2, y=20+GUI.image_size/2,anchor="center")
         elif position == "generated":
             img = ImageTk.PhotoImage(Image.fromarray(self.generated_image))
-            self.generated_image_label = Label(self, image=img)
+            if self.generated_image_label == None:
+                self.generated_image_label = Label(self, image=img)
+            self.generated_image_label.configure(image=img)
             self.generated_image_label.image = img
             self.generated_image_label.place(x=660+GUI.image_size/2, y=20+GUI.image_size/2,anchor="center")
 
