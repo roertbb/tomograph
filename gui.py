@@ -3,8 +3,9 @@ from tkinter import filedialog
 from PIL import ImageTk, Image
 import cv2
 import numpy as np
-from main import gen_emiter_pos, get_detectors_pos, gen_sinogram, gen_image, normalize_image_iterative, apply_window
-# import pydicom
+from main import gen_emiter_pos, get_detectors_pos, gen_sinogram, gen_image, normalize_image_iterative, apply_window, normalize
+import pydicom
+from matplotlib import pyplot as plt
 
 class GUI(Frame):
     image_size = 300
@@ -97,13 +98,10 @@ class GUI(Frame):
         splitted_path = file_path.split(".")
         extension = splitted_path[len(splitted_path)-1].lower()
         if extension == "dcm":
-            print("dicom")
-            # ds = pydicom.dcmread(file_path)
-            # print(ds.PixelData)
-            # plt.imshow(ds.pixel_array, cmap=plt.cm.bone)
-            # plt.show()
+            ds = pydicom.dcmread(file_path)
+            self.load_image('',img=ds.pixel_array)
         elif extension == "jpg" or extension == "png":
-            self.load_image(file_path)
+            self.load_image(img_path)
         else:
             print("undefined extension")
 
@@ -137,9 +135,12 @@ class GUI(Frame):
             img = cv2.resize(img,(int(GUI.img_max_size * size[1]/max(size[0],size[1])),int(GUI.img_max_size * size[0]/max(size[0],size[1]))))
         return img
             
-    def load_image(self, img_path):
-        img = cv2.imread(img_path,cv2.IMREAD_GRAYSCALE)
-        img = self.resize_image_to_display(img)
+    def load_image(self, img_path, img=None):
+        if img_path != "":
+            image = cv2.imread(img_path,cv2.IMREAD_GRAYSCALE)
+        else:
+            image = normalize(img)
+        img = self.resize_image_to_display(image)
         self.original_image = img
         self.display_image("original")
         self.update()
@@ -178,6 +179,8 @@ class GUI(Frame):
         emiter_pos = gen_emiter_pos(img_size, delta_a)
         detectors_pos = get_detectors_pos(img_size, delta_a, n, l)
         sinogram = gen_sinogram(self.original_image, emiter_pos, detectors_pos, img_size, doConvolution, callback=sinogram_callback)
+        self.sinogram = sinogram
+        self.display_image("sinogram")
         sinogram = apply_window(sinogram)
         generated_image = gen_image(img_size, sinogram, emiter_pos, detectors_pos, callback=generate_image_callback)
         self.generated_image = generated_image
