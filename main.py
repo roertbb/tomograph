@@ -91,13 +91,14 @@ def get_detectors_pos(size, delta_alpha, n, l):
 def normalize(img):
     cp = img[:]
     maximum = np.amax(img)
+    minimum = np.amin(img)
     for i in range(len(img)):
         for j in range(len(img[0])):
-            cp[i][j] = img[i][j]/maximum * 256
+            cp[i][j] = (img[i][j]-minimum)/(maximum-minimum) * 255
     return cp
 
 
-def gen_sinogram(img, emiter_pos, detectors_pos, size, doConvolution = True, callback=None):
+def gen_sinogram(img, emiter_pos, detectors_pos, size, doConvolution = True, callback=None, mask = [-1,-2,7,-2,-1]):
     sinogram = np.zeros(shape=(len(detectors_pos),len(emiter_pos)))
     for it in range(len(emiter_pos)): #iterations
         for detector_id in range(len(detectors_pos)):
@@ -112,7 +113,6 @@ def gen_sinogram(img, emiter_pos, detectors_pos, size, doConvolution = True, cal
                     counter += 1
             sinogram[detector_id][it] = 0 if counter == 0 else int(value/counter)
         if doConvolution:
-            mask = [-1,-2,7,-2,-1]
             padding = int(len(mask)/2)
             for i in range(padding, len(detectors_pos)-padding):
                 sinogram[i][it] = lin_convolution(sinogram,i,it,mask,padding)
@@ -177,6 +177,7 @@ def gen_image(size, sinogram, emiter_pos, detectors_pos, callback=None):
 
     # return image
     normalized_image = normalize_image(size, image, counter)
+    normalized_image = normalize(normalized_image)
     return normalized_image
 
 def apply_window(sinogram):
@@ -199,8 +200,8 @@ if __name__ == "__main__":
     emiter_pos = gen_emiter_pos(size, delta_alpha)
     detectors_pos = get_detectors_pos(size, delta_alpha, n, l)
     sinogram = gen_sinogram(img, emiter_pos, detectors_pos, size)
+    plot_image(sinogram)
     sinogram = apply_window(sinogram)
-    # plot_image(sinogram)
+    plot_image(sinogram)
     image = gen_image(size, sinogram, emiter_pos, detectors_pos)
-    # image = normalize(image)
     plot_image(image)
