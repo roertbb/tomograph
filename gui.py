@@ -3,9 +3,11 @@ from tkinter import filedialog
 from PIL import ImageTk, Image
 import cv2
 import numpy as np
-from main import gen_emiter_pos, get_detectors_pos, gen_sinogram, gen_image, normalize_image_iterative, apply_window, normalize
 import pydicom
 from matplotlib import pyplot as plt
+
+from main import gen_emiter_pos, get_detectors_pos, gen_sinogram, gen_image, normalize_image_iterative, apply_window, normalize
+from dicom_window import DicomWindow
 
 class GUI(Frame):
     image_size = 300
@@ -16,7 +18,7 @@ class GUI(Frame):
     init_convolution = True
     img_max_size = 300
 
-    def __init__(self, root):
+    def __init__(self, master):
         super().__init__()
         # tomograph params
         self.detectors_num = GUI.init_detectors_num
@@ -32,7 +34,7 @@ class GUI(Frame):
         self.generated_image_label = None
 
         # gui
-        self.root = root
+        self.master = master
         self.master.title("Tomograph")
         self.master.geometry("980x600")
         self.pack(fill=BOTH, expand=1)
@@ -86,6 +88,9 @@ class GUI(Frame):
         self.run_tomograph_iterative = Button(self, text="Run tomograph (iteratively)", command=lambda: self.process(iteratively=True))
         self.run_tomograph_iterative.place(x=255, y=500)
 
+        self.save_to_dicom = Button(self, text="Save to dicom", command=lambda: self.create_dicom_window())
+        self.save_to_dicom.place(x=460, y=500)
+
         self.status = Label(self, text="Status:")
         self.status.place(x=20,y=535)
         
@@ -95,15 +100,21 @@ class GUI(Frame):
 
     def choose_image(self):
         file_path = filedialog.askopenfilename(initialdir = "./",title = "Select image to process",filetypes = (("jpeg files","*.jpg"),("dicom files","*.dcm"),("all files","*.*")))
+        if file_path == None:
+            return
         splitted_path = file_path.split(".")
         extension = splitted_path[len(splitted_path)-1].lower()
         if extension == "dcm":
             ds = pydicom.dcmread(file_path)
             self.load_image('',img=ds.pixel_array)
         elif extension == "jpg" or extension == "png":
-            self.load_image(img_path)
+            self.load_image(file_path)
         else:
             print("undefined extension")
+
+    def create_dicom_window(self):
+        root2 = Toplevel(self.master)
+        dicom_window = DicomWindow(root2,img=self.generated_image)
 
     def display_image(self, position):
         if position == "original":
@@ -139,7 +150,11 @@ class GUI(Frame):
         if img_path != "":
             image = cv2.imread(img_path,cv2.IMREAD_GRAYSCALE)
         else:
-            image = normalize(img)
+            maximum = np.amax(img)
+            if (maximum > 255):
+                image = normalize(img)
+            else:
+                image = img
         img = self.resize_image_to_display(image)
         self.original_image = img
         self.display_image("original")

@@ -97,7 +97,6 @@ def normalize(img):
             cp[i][j] = (img[i][j]-minimum)/(maximum-minimum) * 255
     return cp
 
-
 def gen_sinogram(img, emiter_pos, detectors_pos, size, doConvolution = True, callback=None, mask = [-2,5,-2]):
     sinogram = np.zeros(shape=(len(detectors_pos),len(emiter_pos)))
     for it in range(len(emiter_pos)): #iterations
