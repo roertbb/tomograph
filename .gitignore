@@ -1,3 +1,5 @@
 /data
 /measurements
 /results
+/python3-gdcm
+/__pycache__/**
